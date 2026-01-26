@@ -13,12 +13,13 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// --- AI Chat Route ---
 app.post("/chat", async (req, res) => {
   try {
     const userMessage = req.body.message;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // cheapest small model
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "You are a helpful AI assistant for small business customer service." },
         { role: "user", content: userMessage }
@@ -32,13 +33,17 @@ app.post("/chat", async (req, res) => {
   } catch (err) {
     console.error("SERVER ERROR 👉", err);
 
-    // If quota exceeded
     if (err.code === "insufficient_quota" || err.status === 429) {
       res.status(200).json({ reply: "❌ No API credit left. Please top up your OpenAI account." });
     } else {
       res.status(500).json({ reply: "❌ AI server error. Please try again later." });
     }
   }
+});
+
+// --- STATUS ROUTE ---
+app.get("/status", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 app.listen(3000, () => console.log("Server running on http://localhost:3000"));
