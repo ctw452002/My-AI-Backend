@@ -16,12 +16,15 @@ const openai = new OpenAI({
 // --- AI Chat Route ---
 app.post("/chat", async (req, res) => {
   try {
+    // We now extract both 'message' and 'context' (Knowledge Base) from the body
     const userMessage = req.body.message;
+    const businessContext = req.body.context || "You are a helpful AI assistant for small business customer service.";
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are a helpful AI assistant for small business customer service." },
+        // The system role now uses the context provided by the Business Owner
+        { role: "system", content: businessContext },
         { role: "user", content: userMessage }
       ],
       max_tokens: 300
@@ -41,9 +44,11 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// --- STATUS ROUTE ---
+// --- STATUS ROUTE (Used for Dashboard Latency Check) ---
 app.get("/status", (req, res) => {
-  res.json({ status: "ok" });
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.listen(3000, () => console.log("Server running on http://localhost:3000"));
+// Use process.env.PORT for live deployment (Render/Heroku)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
