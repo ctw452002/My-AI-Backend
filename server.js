@@ -12,7 +12,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 let botSettings = {
   isStopped: false,
-  knowledgeBase: "You are 天维, a professional AI executive assistant. Keep replies concise.",
+  knowledgeBase: "You are 天维, a professional executive assistant. Keep replies concise.",
   quickChips: ["Services", "Pricing", "Contact"]
 };
 
@@ -22,11 +22,10 @@ app.post("/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
 
-    // THE FIX: Combine System Prompt + History + The New Message
     const apiMessages = [
       { role: "system", content: botSettings.knowledgeBase },
-      ...(history || []), // Previous context
-      { role: "user", content: message } // The current question
+      ...(history || []),
+      { role: "user", content: message }
     ];
 
     const completion = await openai.chat.completions.create({
@@ -44,15 +43,21 @@ app.post("/chat", async (req, res) => {
       time: new Date().toLocaleTimeString() 
     });
 
-    // Keep logs manageable
     if (adminLogs.length > 50) adminLogs.pop();
     
     res.json({ reply });
 
   } catch (err) {
-    // This helps you debug in the Render dashboard logs
-    console.error("OpenAI API Error:", err.message);
-    res.status(500).json({ reply: "Connection error. Please try again." });
+    console.error("Backend Error:", err);
+
+    // --- THE FIX IS HERE ---
+    // We check if the error is specifically about the Quota/Billing
+    if (err.status === 429 || (err.message && err.message.includes("quota"))) {
+        res.status(429).json({ reply: "❌ Error: API Quota Exceeded." });
+    } else {
+        // Otherwise, show the generic connection error
+        res.status(500).json({ reply: "❌ Connection error. Please try again." });
+    }
   }
 });
 
