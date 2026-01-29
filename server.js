@@ -22,9 +22,11 @@ app.post("/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
 
+    // THE FIX: Combine System Prompt + History + The New Message
     const apiMessages = [
       { role: "system", content: botSettings.knowledgeBase },
-      ...(history || [])
+      ...(history || []), // Previous context
+      { role: "user", content: message } // The current question
     ];
 
     const completion = await openai.chat.completions.create({
@@ -34,19 +36,33 @@ app.post("/chat", async (req, res) => {
     });
 
     const reply = completion.choices[0].message.content;
-    adminLogs.unshift({ user: message, bot: reply, time: new Date().toLocaleTimeString() });
+
+    // Log for the Admin Dashboard
+    adminLogs.unshift({ 
+      user: message, 
+      bot: reply, 
+      time: new Date().toLocaleTimeString() 
+    });
+
+    // Keep logs manageable
+    if (adminLogs.length > 50) adminLogs.pop();
     
     res.json({ reply });
+
   } catch (err) {
-    res.status(500).json({ reply: "Connection error." });
+    // This helps you debug in the Render dashboard logs
+    console.error("OpenAI API Error:", err.message);
+    res.status(500).json({ reply: "Connection error. Please try again." });
   }
 });
 
 app.get("/settings", (req, res) => res.json(botSettings));
 app.get("/history", (req, res) => res.json(adminLogs));
+
 app.post("/settings", (req, res) => {
   botSettings = { ...botSettings, ...req.body };
   res.json({ success: true });
 });
 
-app.listen(process.env.PORT || 3000, () => console.log("Server Active"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server Active on port ${PORT}`));
