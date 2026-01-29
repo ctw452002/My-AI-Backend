@@ -4,69 +4,58 @@ import dotenv from "dotenv";
 import OpenAI from "openai";
 
 dotenv.config();
-
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- GLOBAL MEMORY ---
 let botSettings = {
   isStopped: false,
-  knowledgeBase: "You are a helpful AI assistant for customer service.",
+  knowledgeBase: "You are 天维, a professional AI executive assistant.",
   startHour: 0,
   endHour: 23,
-  quickChips: ["Pricing", "Location", "Contact Us"] 
+  quickChips: ["Services", "Pricing", "Contact"]
 };
 
-let chatHistory = [];
-
-app.get("/settings", (req, res) => res.json(botSettings));
-
-app.post("/settings", (req, res) => {
-  botSettings = { ...botSettings, ...req.body };
-  res.json({ success: true, settings: botSettings });
-});
-
-app.get("/history", (req, res) => res.json(chatHistory));
+// Dashboard log (for admin only)
+let adminLogs = [];
 
 app.post("/chat", async (req, res) => {
   try {
-    if (botSettings.isStopped) {
-      return res.json({ reply: "The AI is currently paused by the admin." });
-    }
+    const { message, history } = req.body;
 
-    const currentHour = new Date().getHours();
-    if (currentHour < botSettings.startHour || currentHour > botSettings.endHour) {
-      return res.json({ reply: `I'm currently off-duty. Hours: ${botSettings.startHour}:00 - ${botSettings.endHour}:00.` });
-    }
+    // Build context: Knowledge Base + Sliced History
+    const apiMessages = [
+      { role: "system", content: botSettings.knowledgeBase },
+      ...history
+    ];
 
-    const userMessage = req.body.message;
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: botSettings.knowledgeBase },
-        { role: "user", content: userMessage }
-      ],
-      max_tokens: 300
+      messages: apiMessages,
+      max_tokens: 400
     });
 
     const reply = completion.choices[0].message.content;
 
-    chatHistory.unshift({ user: userMessage, bot: reply, time: new Date().toLocaleTimeString() });
-    if (chatHistory.length > 30) chatHistory.pop();
+    // Update Admin Logs
+    adminLogs.unshift({ user: message, bot: reply, time: new Date().toLocaleTimeString() });
+    if (adminLogs.length > 50) adminLogs.pop();
 
     res.json({ reply });
   } catch (err) {
-    if (err.status === 429) {
-      return res.status(429).json({ reply: "❌ Quota Exceeded." });
-    }
-    res.status(500).json({ reply: "❌ AI server error." });
+    res.status(500).json({ reply: "I'm having trouble connecting to my brain. Try again?" });
   }
 });
 
-app.get("/status", (req, res) => res.json({ status: "ok" }));
+app.get("/settings", (req, res) => res.json(botSettings));
+app.get("/history", (req, res) => res.json(adminLogs));
+
+app.post("/settings", (req, res) => {
+  botSettings = { ...botSettings, ...req.body };
+  res.json({ success: true });
+});
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server live on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
