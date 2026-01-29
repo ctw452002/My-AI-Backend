@@ -13,7 +13,9 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 let botSettings = {
   isStopped: false,
   knowledgeBase: "You are 天维, a professional executive assistant. Keep replies concise.",
-  quickChips: ["Services", "Pricing", "Contact"]
+  quickChips: ["Services", "Pricing", "Contact"],
+  startHour: 0,
+  endHour: 23
 };
 
 let adminLogs = [];
@@ -22,6 +24,20 @@ app.post("/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
 
+    // 1. CHECK MASTER KILL SWITCH
+    if (botSettings.isStopped) {
+      return res.json({ reply: "⏸️ Service is currently paused by the administrator." });
+    }
+
+    // 2. CHECK OPERATING HOURS
+    const currentHour = new Date().getHours(); 
+    if (currentHour < botSettings.startHour || currentHour > botSettings.endHour) {
+      return res.json({ 
+        reply: `🌙 We are currently off-duty. Operating hours are ${botSettings.startHour}:00 to ${botSettings.endHour}:00.` 
+      });
+    }
+
+    // 3. PROCEED TO AI IF CHECKS PASS
     const apiMessages = [
       { role: "system", content: botSettings.knowledgeBase },
       ...(history || []),
@@ -50,12 +66,9 @@ app.post("/chat", async (req, res) => {
   } catch (err) {
     console.error("Backend Error:", err);
 
-    // --- THE FIX IS HERE ---
-    // We check if the error is specifically about the Quota/Billing
     if (err.status === 429 || (err.message && err.message.includes("quota"))) {
         res.status(429).json({ reply: "❌ Error: API Quota Exceeded." });
     } else {
-        // Otherwise, show the generic connection error
         res.status(500).json({ reply: "❌ Connection error. Please try again." });
     }
   }
