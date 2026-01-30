@@ -10,14 +10,18 @@ app.use(express.json());
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// ... existing imports ...
+
 let botSettings = {
   isStopped: false,
-  knowledgeBase: "You are 天维, a professional executive assistant. Keep replies concise.",
+  showChips: true, // NEW: The master toggle for quick replies
+  knowledgeBase: "You are 天维, a professional executive assistant...",
   quickChips: ["Services", "Pricing", "Contact"],
   startHour: 0,
   endHour: 23
 };
 
+// ... existing chat and settings routes ...
 let adminLogs = [];
 
 app.post("/chat", async (req, res) => {
